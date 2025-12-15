@@ -45,6 +45,7 @@ class PatternResult:
     name: str = "None"
     confidence: float = 0.0
     pivotPrice: Optional[float] = None
+    stage: str = "None" # "Base", "NearPivot", "Breakout"
     notes: str = ""
 
 @dataclass
@@ -61,6 +62,8 @@ class SetupDecision:
     reasons: List[str]
     price: float
     changePct: float
+    state: str = "WATCH" # "READY", "WATCH"
+    setupStage: str = "" # "BO_TODAY", "BASE_BUILDING", etc.
 
 
 # -------------------------------------------------------------------------
@@ -83,20 +86,13 @@ def is_earnings_noise(td: TickerData) -> bool:
         return True
     if td.daysToEarnings and td.daysToEarnings <= 3 and abs(td.gapPctToday) >= 0.06:
         return True
-    # Simplified check for previous day gap
     if abs(td.gapPctPrevDay) >= 0.08: 
         return True
     return False
 
 def earnings_penalty(td: TickerData) -> int:
-    if not is_earnings_noise(td):
-        return 0
-    penalty = 12
-    if td.daysToEarnings and td.daysToEarnings <= 3:
-        penalty += 6
-    if abs(td.gapPctToday) >= 0.10:
-        penalty += 6
-    return penalty
+    if not is_earnings_noise(td): return 0
+    return 12
 
 def trend_score(td: TickerData) -> int:
     s = 0
@@ -119,15 +115,10 @@ def rs_score(td: TickerData) -> int:
     return -10
 
 def volume_score(td: TickerData) -> int:
-    # Simplified volume analysis since we might not have full history in this iteration
     s = 0
     if td.volume >= 1.5 * td.avgVol20: s += 8
-    
-    # Placeholder for detailed up/down volume analysis
-    # Assuming slight bullish bias if price is up
     if td.changePct > 0: s += 7
     else: s -= 5
-    
     return max(-15, min(15, s))
 
 def extended_penalty(td: TickerData) -> int:
@@ -140,29 +131,39 @@ def extended_penalty(td: TickerData) -> int:
         dist21 = (td.price - td.ema21) / td.ema21
         if dist21 >= EXTENDED_FROM_EMA21_WARN: p += 8
         
+    # Climactic action check
     today_range_pct = (td.high - td.low) / td.low if td.low > 0 else 0
     if today_range_pct >= 0.07 and td.volume >= 2.0 * td.avgVol20:
         p += 6
-        
     return p
 
 def detect_pattern(td: TickerData) -> PatternResult:
-    # Simplified pattern detection hooks
-    # In a real engine, this would analyze candlesDaily
-    
     pr = PatternResult()
     
-    # Simple proxies for patterns
-    if td.price > td.recentHigh20 and td.volume > td.avgVol20:
-        pr.name = "Breakout"
-        pr.confidence = 0.70
-        pr.pivotPrice = td.recentHigh20
+    # 1. Breakout detection (Pivot = 20d High)
+    pivot = td.recentHigh20
     
-    elif td.price > td.sma50 and abs(td.price - td.sma50) / td.sma50 < 0.03:
-        pr.name = "Support Bounce"
+    # Check "Near Pivot" (within 3%)
+    if pivot > 0 and 0.97 <= td.price / pivot <= 1.02:
+        pr.name = "Consolidation"
+        pr.stage = "NearPivot"
         pr.confidence = 0.60
-        pr.pivotPrice = td.sma50
+        pr.pivotPrice = pivot
         
+    # Check "Breakout" (Price > Pivot)
+    elif pivot > 0 and td.price > pivot:
+        pr.name = "Breakout"
+        pr.stage = "Breakout"
+        pr.confidence = 0.70
+        pr.pivotPrice = pivot
+        
+    # Check "Base Building" (Below Pivot but above SMA50)
+    elif td.price < pivot and td.price > td.sma50:
+         pr.name = "Base"
+         pr.stage = "Base"
+         pr.confidence = 0.50
+         pr.pivotPrice = pivot
+    
     return pr
 
 def options_liquidity_tag(opt: OptionsSnapshot) -> Tuple[bool, List[str]]:
@@ -195,33 +196,34 @@ def compute_score(td: TickerData, opt: OptionsSnapshot, pattern: PatternResult) 
     
     base += (t + r + v)
     
-    if pattern.name != "None":
-        base += round(8 * pattern.confidence)
-        reasons.append(f"Pattern: {pattern.name}")
-        
+    # Pattern Score
+    if pattern.stage == "Breakout":
+        base += 15
+        reasons.append("Pattern: Breakout")
+    elif pattern.stage == "NearPivot":
+        base += 10
+        reasons.append("Pattern: Near Pivot (Setting Up)")
+    elif pattern.stage == "Base":
+        base += 5
+        reasons.append("Pattern: Base Building")
+
     # Penalties
     ep = extended_penalty(td)
     if ep > 0:
         base -= ep
-        tags.append("Extended/Climactic")
+        tags.append("Extended")
         reasons.append(f"Extended penalty: -{ep}")
         
     earnP = earnings_penalty(td)
     if earnP > 0:
         base -= earnP
         tags.append("EarningsNoise")
-        reasons.append(f"Earnings noise penalty: -{earnP}")
-        
-    reasons.append(f"RS: {td.rsTrend}")
     
     optGood, optTags = options_liquidity_tag(opt)
     tags.extend(optTags)
-    if optGood:
-        tags.append("OptionsOK")
+    if optGood: tags.append("OptionsOK")
         
     score = max(0, min(100, int(base)))
-    
-    # Add score breakdown to reasons for visibility
     reasons.append(f"Trend:{t} RS:{r} Vol:{v}")
     
     return score, tags, reasons
@@ -229,127 +231,88 @@ def compute_score(td: TickerData, opt: OptionsSnapshot, pattern: PatternResult) 
 def grade_from_score(score: int) -> str:
     if score >= 90: return "A+"
     if score >= 80: return "A"
-    if score >= 70: return "B+"
-    if score >= 60: return "B"
-    if score >= 50: return "C"
+    if score >= 75: return "B+"
+    if score >= 65: return "B"
+    if score >= 55: return "C"
     return "D"
 
 # -------------------------------------------------------------------------
-# 5) Account Assignmnet
+# 5) Account Assignmnet (Refined)
 # -------------------------------------------------------------------------
-def assign_account(td: TickerData, opt: OptionsSnapshot, score: int, tags: List[str], pattern: PatternResult) -> int:
+def assign_account(td: TickerData, opt: OptionsSnapshot, score: int, tags: List[str], pattern: PatternResult) -> Tuple[int, str, str]:
+    """Returns (AccountId, State, SetupStage)"""
     
-    # Check "Avoid" conditions first? 
-    # Logic based on user pseudo-code
+    state = "WATCH"
+    setup_stage = "None"
     
-    near_earnings = False
-    if td.daysToEarnings is not None and td.daysToEarnings <= EARNINGS_DAYS_BLOCK_SHORT:
-        near_earnings = True
-        
-    optGood, _ = options_liquidity_tag(opt)
-    
-    # 1) Options Swing (Account 7)
-    if optGood and score >= OPT_MIN_GRADE_SCORE and "EarningsNoise" not in tags:
-        if "Extended/Climactic" not in tags:
-            return 7
-            
-    # 2) Short Swing (Account 1)
-    # Trigger: reclaim EMA9/21
-    is_short_swing = td.close > td.ema9 and td.close > td.ema21 
-    if score >= 70 and not near_earnings and is_short_swing:
-        return 1
-        
-    # 3) Swing/SQ (Account 2)
-    # Trigger: Pullback
-    is_swing = td.close > td.sma50
-    if score >= 60 and not near_earnings and is_swing:
-        return 2
-        
-    # 4) POS Breakout (Account 3)
-    if score >= 70 and pattern.name == "Breakout":
-        return 3
-        
-    # 5) POS High Vol (Account 4)
-    if score >= 65 and td.volume > 2 * td.avgVol20:
-        return 4
-        
-    # 6) POS Pattern (Account 5)
-    if score >= 70 and pattern.name in ["CupAndHandle", "FlatBase", "AscTriangle", "Flag", "Support Bounce"]:
-        return 5
-        
-    # 7) Long-term INV (Account 6)
-    if score >= 60 and td.price > td.sma200 and td.sma50 > td.sma200:
-        return 6
-        
-    # 8) Lottery (Account 8)
-    if opt.hasOptions and "WideSpread" not in tags and "NoOptions" not in tags:
-        if td.daysToEarnings is None or td.daysToEarnings > EARNINGS_DAYS_BLOCK_OPTIONS:
-             return 8
-             
-    return 0 # Watchlist
-
-# -------------------------------------------------------------------------
-# 6) Plan Generator
-# -------------------------------------------------------------------------
-def build_plan(account_id: int, td: TickerData, pattern: PatternResult) -> Tuple[List[str], List[str], List[str]]:
-    
-    entry = []
-    stop = []
-    exit_plan = []
-    
+    # -------------------------------------------------
+    # Account 3: POS BO/SQ (20-60 days)
+    # -------------------------------------------------
     pivot = pattern.pivotPrice if pattern.pivotPrice else td.recentHigh20
-    
-    if account_id == 1: # SH Swing
-        entry = [
-            "Entry1: reclaim EMA9/EMA21 + green candle close",
-            "Entry2: break above prior day high",
-            "Volume confirm: today vol >= 1.5x avg20"
-        ]
-        stop = ["Stop: close below EMA9", "Hard stop: -2R or below last swing low"]
-        exit_plan = ["Take profit: +3% to +7%", "Exit: close below EMA9"]
+
+    # BO_TODAY
+    if pattern.stage == "Breakout" and td.volume >= 1.4 * td.avgVol20 and score >= 70:
+        return 3, "READY", "BO_TODAY"
         
-    elif account_id == 2: # Swing
-        entry = ["Entry: pullback to EMA21 or SMA50", "Trigger: break of pullback trendline"]
-        stop = ["Stop: close below EMA21; deep pullback below SMA50"]
-        exit_plan = ["Target: +10% to +20%", "Exit: breakdown below EMA21"]
+    # BO_RECENT (Price > pivot, but maybe vol low today or it was few days ago)
+    if pattern.stage == "Breakout" and score >= 65:
+        return 3, "WATCH", "BO_RECENT"
         
-    elif account_id == 3: # POS BO
-        entry = [f"Entry: buy breakout above pivot {pivot:.2f} with vol >= 1.4x", "Add: if holds pivot"]
-        stop = ["Stop: -7% to -8% (O'Neil rule)", "Exit early: fail back into base"]
-        exit_plan = ["Take profit: partial +20%", "Hold: while price above EMA21"]
+    # TIGHT_NEAR_PIVOT
+    if pattern.stage == "NearPivot" and score >= 65:
+        return 3, "WATCH", "NEAR_PIVOT"
+
+    # -------------------------------------------------
+    # Account 4: POS HVOL (Pocket Pivot / Accumulation)
+    # -------------------------------------------------
+    # Simplified: 2x Vol OR recent accumulation
+    if score >= 65 and td.volume > 2.0 * td.avgVol20:
+        return 4, "READY", "POCKET_PIVOT"
         
-    elif account_id == 4: # POS HVOL
-        entry = ["Entry: after HV demand day, buy tight pullback", "Confirm: supply dry up"]
-        stop = ["Stop: close below EMA21 or demand-day low"]
-        exit_plan = ["Exit: distribution spike or RS roll over"]
+    # Accumulation Cluster (Mock: Vol > 1.2x avg)
+    if score >= 60 and td.volume > 1.2 * td.avgVol20:
+         return 4, "WATCH", "ACCUMULATION"
+
+    # -------------------------------------------------
+    # Account 5: POS PAT (Patterns)
+    # -------------------------------------------------
+    if pattern.stage == "NearPivot" and score >= 65:
+        return 5, "WATCH", "HANDLE_FORMING"
         
-    elif account_id == 5: # POS PAT
-        entry = ["Entry: pattern pivot breakout", "Confirm: volume expansion"]
-        stop = ["Stop: -7% to -8% or pattern invalidation"]
-        exit_plan = ["Exit: failure back into base"]
+    if pattern.stage == "Base" and score >= 55: 
+        # Lower score accepted for bases, but it's just "WATCH"
+        return 5, "WATCH", "BASE_BUILDING"
         
-    elif account_id == 6: # INV
-        entry = ["Entry: add on pullbacks to SMA50", "Prefer: rising RS"]
-        stop = ["Stop: major trend break (SMA50 down + price < SMA200)"]
-        exit_plan = ["Exit: RS deteriorates", "Trim: climactic run"]
-        
-    elif account_id == 7: # OPT Swing
-        entry = ["Entry: breakout/pullback near SMA50", "Options: spread <=5%, OI>=1000"]
-        stop = ["Stop: underlying closes below SMA50", "Opt Stop: -30% premium"]
-        exit_plan = ["Take profit: +30%-50% option gain", "Time stop: 3-5 days no move"]
-        
-    elif account_id == 8: # Lottery
-        entry = ["Entry: intraday break + RVOL spike", "Rules: NO earnings"]
-        stop = ["Hard stop: underlying loses VWAP", "Opt Stop: -20% premium"]
-        exit_plan = ["Exit quickly: +15% to +30%", "Time stop: end of day"]
-        
-    else:
-        entry = ["Watch only"]
-        
-    return entry, stop, exit_plan
+    # -------------------------------------------------
+    # Account 6: INV (Long Term)
+    # -------------------------------------------------
+    # Primary logic: Up Trend
+    is_uptrend = td.price > td.sma200 and td.sma50 > td.sma200
+    if is_uptrend:
+        if "Extended" in tags:
+            return 6, "WATCH", "EXTENDED_WAIT"
+        elif score >= 60:
+            return 6, "READY", "BUYABLE_PULLBACK" if (td.price < td.sma50 * 1.05) else "HOLD/ADD"
+            
+    # -------------------------------------------------
+    # Account 1: Short Swing (Momentum)
+    # -------------------------------------------------
+    is_short_swing = td.close > td.ema9 and td.close > td.ema21
+    if is_short_swing and score >= 70 and pattern.stage == "Breakout":
+         return 1, "READY", "MOMENTUM_BREAK"
+
+    # -------------------------------------------------
+    # Account 7: OPT Swing
+    # -------------------------------------------------
+    optGood = "OptionsOK" in tags
+    if optGood and score >= 70 and pattern.stage in ["Breakout", "NearPivot"]:
+        state = "READY" if pattern.stage == "Breakout" else "WATCH"
+        return 7, state, f"OPT_{pattern.stage.upper()}"
+
+    return 0, "WATCH", "NONE"
 
 # -------------------------------------------------------------------------
-# 7) Main Interface
+# 6) Main Interface
 # -------------------------------------------------------------------------
 
 def analyze_ticker(td: TickerData, opt: OptionsSnapshot) -> SetupDecision:
@@ -357,20 +320,11 @@ def analyze_ticker(td: TickerData, opt: OptionsSnapshot) -> SetupDecision:
     score, tags, reasons = compute_score(td, opt, pattern)
     grade = grade_from_score(score)
     
-    # Options suitability/warning
-    optGood, optTags = options_liquidity_tag(opt)
-    if not optGood:
-        tags.append("OptionsNotIdeal")
-        
-    # Explicit warnings
-    if "Extended/Climactic" in tags:
-        reasons.append("High spike risk: likely consolidation")
-    if "EarningsNoise" in tags:
-        reasons.append("Move likely earnings-driven; wait for base")
-        
-    account_id = assign_account(td, opt, score, tags, pattern)
-    entry, stop, exit_p = build_plan(account_id, td, pattern)
+    account_id, state, setup_stage = assign_account(td, opt, score, tags, pattern)
     
+    # Generate plans based on the assigned account, even if it's just WATCH
+    entry, stop, exit_p = build_plan(account_id, td, pattern)
+
     return SetupDecision(
         accountId=account_id,
         ticker=td.symbol,
@@ -379,9 +333,11 @@ def analyze_ticker(td: TickerData, opt: OptionsSnapshot) -> SetupDecision:
         entryPlan=entry,
         stopPlan=stop,
         exitPlan=exit_p,
-        tags=list(set(tags)), # unique
+        tags=list(set(tags)),
         pattern=pattern,
         reasons=reasons,
         price=td.price,
-        changePct=td.changePct
+        changePct=td.changePct,
+        state=state,
+        setupStage=setup_stage
     )

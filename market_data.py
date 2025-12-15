@@ -13,12 +13,25 @@ FMP_API_KEY = os.getenv('FMP_API_KEY')
 TWELVE_DATA_API_KEY = os.getenv('TWELVE_DATA_API_KEY')
 
 # Defines the universe to scan. 
-# For now, we combine all strategy lists into one master list to scan and re-bucket dynamically.
+# Expanded universe to ensure tabs are populated with WATCH candidates.
 MASTER_TICKER_LIST = [
-    "TSLA", "NVDA", "AMD", "MARA", "COIN", "PLTR", "SOFI", "DKNG", "HOOD", "RIVN",
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META", "JPM", "BAC", "WFC", "GS", "C",
-    "GME", "AMC", "CVNA", "UPST", "AFRM", "KO", "PEP", "JNJ", "PG", "MCD",
-    "SPY", "QQQ", "IWM", "DIA", "TLT", "INTC", "F", "T", "VZ", "PFE"
+    # Mega Cap / Tech Leaders
+    "TSLA", "NVDA", "AMD", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NFLX", "AVGO",
+    # Growth / Momentum
+    "PLTR", "SOFI", "DKNG", "HOOD", "RIVN", "CVNA", "UPST", "AFRM", "COIN", "MARA",
+    "NET", "DDOG", "SNOW", "CRWD", "ZS", "PANW", "TTD", "ROKU", "SHOP", "SE",
+    # Financials
+    "JPM", "BAC", "WFC", "GS", "C", "MS", "BLK", "AXP", "V", "MA", "PYPL",
+    # Industrial / Energy / Classic
+    "CAT", "DE", "BA", "LMT", "XOM", "CVX", "COP", "SLB", "HAL", "OXY",
+    # Consumer / Retail
+    "MCD", "SBUX", "NKE", "LULU", "TGT", "WMT", "COST", "HD", "LOW", "CMG",
+    # Pharma / Bio
+    "LLY", "NVO", "MRK", "JNJ", "PFE", "ABBV", "AMGN", "GILD", "VRTX", "REGN",
+    # ETFs (for Options / Ref)
+    "SPY", "QQQ", "IWM", "DIA", "TLT", "SMH", "XLF", "XLE", "XLK", "ARKK",
+    # Meme / High Vol
+    "GME", "AMC"
 ]
 
 def fetch_ticker_data_triple_api(symbol: str) -> Optional[TickerData]:
@@ -79,7 +92,11 @@ def fetch_ticker_data_triple_api(symbol: str) -> Optional[TickerData]:
     
     # Basics
     price = float(close.iloc[-1])
-    prev_close = float(close.iloc[-2])
+    try:
+        prev_close = float(close.iloc[-2])
+    except IndexError:
+        prev_close = price # Fallback for very new stocks
+        
     change_pct = ((price - prev_close) / prev_close) * 100
     
     # Moving Averages
