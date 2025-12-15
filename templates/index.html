@@ -129,147 +129,153 @@
                                 View Plan
                             </button>
                             <!-- Dropdown: Dynamic positioning -->
-                            {% set dropdown_pos = 'bottom-full mb-2 origin-bottom-right' if loop.revindex <= 3
-                                else 'top-full mt-2 origin-top-right' %} <div
-                                class="opacity-0 invisible group-hover:opacity-100 group-hover:visible absolute right-0 {{ dropdown_pos }} w-64 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 p-4 text-left transition-all duration-200">
-                                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Entry Plan</h4>
-                                <ul class="text-xs text-green-300 mb-2 list-disc pl-3">
-                                    {% for item in ticker.entryPlan %}
-                                    <li>{{ item }}</li>
-                                    {% endfor %}
-                                </ul>
-                                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Exit Goal</h4>
-                                <ul class="text-xs text-blue-300 list-disc pl-3">
-                                    {% for item in ticker.exitPlan %}
-                                    <li>{{ item }}</li>
-                                    {% endfor %}
-                                </ul>
+                            {# Only pop UP if we are at the bottom AND not at the very top (to avoid hitting header) #}
+                            {# Simplified logic: pop UP for last 3 items, otherwise DOWN. But if top 3 items are also
+                            last 3 (short list), force DOWN. #}
+                            {% set pop_up = (loop.revindex <= 3 and loop.index> 3) %}
+                                {% set dropdown_pos = 'bottom-full mb-2 origin-bottom-right' if pop_up else 'top-full
+                                mt-2 origin-top-right' %}
+                                <div
+                                    class="opacity-0 invisible group-hover:opacity-100 group-hover:visible absolute right-0 {{ dropdown_pos }} w-64 bg-gray-900/95 backdrop-blur-xl border border-gray-700/50 rounded-lg shadow-2xl z-50 p-4 text-left transition-all duration-200 ring-1 ring-black/5">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Entry Plan</h4>
+                                    <ul class="text-xs text-green-300 mb-2 list-disc pl-3">
+                                        {% for item in ticker.entryPlan %}
+                                        <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Exit Goal</h4>
+                                    <ul class="text-xs text-blue-300 list-disc pl-3">
+                                        {% for item in ticker.exitPlan %}
+                                        <li>{{ item }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
                         </div>
+                        {% else %}
+                        <span class="text-xs text-gray-600 italic">No Plan</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="p-16 text-center text-gray-500">
+                        <div class="flex flex-col items-center justify-center">
+                            <p class="text-lg font-medium text-gray-400">No READY or WATCH candidates</p>
+                            <p class="text-sm mt-2 max-w-sm opacity-60">
+                                Nothing in the scanned universe met the criteria for <strong class="text-gray-300">{{
+                                    current_account.strategy }}</strong>.
+                                <br><br>
+                                <em>Tip: Expand the ticker universe significantly to find more setup candidates.</em>
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-    {% else %}
-    <span class="text-xs text-gray-600 italic">No Plan</span>
-    {% endif %}
-    </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="7" class="p-16 text-center text-gray-500">
-            <div class="flex flex-col items-center justify-center">
-                <p class="text-lg font-medium text-gray-400">No READY or WATCH candidates</p>
-                <p class="text-sm mt-2 max-w-sm opacity-60">
-                    Nothing in the scanned universe met the criteria for <strong class="text-gray-300">{{
-                        current_account.strategy }}</strong>.
-                    <br><br>
-                    <em>Tip: Expand the ticker universe significantly to find more setup candidates.</em>
-                </p>
+
+    <!-- Mobile Card View (Visible on Mobile) -->
+    <div class="md:hidden grid grid-cols-1 gap-4">
+        {% for ticker in tickers %}
+        <div class="bg-gray-900/80 rounded-xl p-5 border border-gray-700/50 shadow-lg relative overflow-hidden">
+            <!-- State Badge Top Right -->
+            <div class="absolute top-0 right-0 p-4">
+                {% if ticker.state == "READY" %}
+                <span
+                    class="px-2 py-1 rounded-full text-[10px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">READY</span>
+                {% elif ticker.state == "WATCH" %}
+                <span
+                    class="px-2 py-1 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">WATCH</span>
+                {% else %}
+                <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-gray-700 text-gray-400">{{ ticker.state
+                    }}</span>
+                {% endif %}
             </div>
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-    </table>
-</div>
 
-<!-- Mobile Card View (Visible on Mobile) -->
-<div class="md:hidden grid grid-cols-1 gap-4">
-    {% for ticker in tickers %}
-    <div class="bg-gray-900/80 rounded-xl p-5 border border-gray-700/50 shadow-lg relative overflow-hidden">
-        <!-- State Badge Top Right -->
-        <div class="absolute top-0 right-0 p-4">
-            {% if ticker.state == "READY" %}
-            <span
-                class="px-2 py-1 rounded-full text-[10px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">READY</span>
-            {% elif ticker.state == "WATCH" %}
-            <span
-                class="px-2 py-1 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">WATCH</span>
-            {% else %}
-            <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-gray-700 text-gray-400">{{ ticker.state
-                }}</span>
-            {% endif %}
-        </div>
-
-        <!-- Header: Ticker & Grade -->
-        <div class="flex items-center gap-3 mb-4">
-            <span class="bg-gray-800 text-white font-bold text-xl px-3 py-1 rounded-lg border border-gray-700">{{
-                ticker.ticker }}</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded
+            <!-- Header: Ticker & Grade -->
+            <div class="flex items-center gap-3 mb-4">
+                <span class="bg-gray-800 text-white font-bold text-xl px-3 py-1 rounded-lg border border-gray-700">{{
+                    ticker.ticker }}</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded
                     {% if 'A' in ticker.grade %}bg-green-900 text-green-300 border border-green-700
                     {% elif 'B' in ticker.grade %}bg-blue-900 text-blue-300 border border-blue-700
                     {% else %}bg-gray-800 text-gray-400{% endif %}">
-                Grade {{ ticker.grade }}
-            </span>
-        </div>
-
-        <!-- Main Data Grid -->
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <p class="text-gray-400 text-xs uppercase tracking-wider">Price</p>
-                <p class="text-2xl font-mono text-white font-bold">${{ ticker.price }}</p>
-                <p
-                    class="text-sm font-bold {% if ticker.changePct >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
-                    {{ "%.2f"|format(ticker.changePct) }}%
-                </p>
+                    Grade {{ ticker.grade }}
+                </span>
             </div>
-            <!-- Score Ring -->
-            <div class="flex flex-col items-center justify-center">
-                <div class="relative w-14 h-14 flex items-center justify-center">
-                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                        <path class="text-gray-700"
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            fill="none" stroke="currentColor" stroke-width="3" />
-                        <path
-                            class="{% if ticker.score >= 80 %}text-green-500{% elif ticker.score >= 60 %}text-blue-500{% else %}text-yellow-500{% endif %}"
-                            stroke-dasharray="{{ ticker.score }}, 100"
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            fill="none" stroke="currentColor" stroke-width="3" />
-                    </svg>
-                    <span class="absolute text-sm font-bold text-white">{{ ticker.score }}</span>
+
+            <!-- Main Data Grid -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <p class="text-gray-400 text-xs uppercase tracking-wider">Price</p>
+                    <p class="text-2xl font-mono text-white font-bold">${{ ticker.price }}</p>
+                    <p
+                        class="text-sm font-bold {% if ticker.changePct >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                        {{ "%.2f"|format(ticker.changePct) }}%
+                    </p>
+                </div>
+                <!-- Score Ring -->
+                <div class="flex flex-col items-center justify-center">
+                    <div class="relative w-14 h-14 flex items-center justify-center">
+                        <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                            <path class="text-gray-700"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none" stroke="currentColor" stroke-width="3" />
+                            <path
+                                class="{% if ticker.score >= 80 %}text-green-500{% elif ticker.score >= 60 %}text-blue-500{% else %}text-yellow-500{% endif %}"
+                                stroke-dasharray="{{ ticker.score }}, 100"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                fill="none" stroke="currentColor" stroke-width="3" />
+                        </svg>
+                        <span class="absolute text-sm font-bold text-white">{{ ticker.score }}</span>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Setup Info -->
-        <div class="mb-4">
-            <div class="text-xs text-gray-500 uppercase">Setup Stage</div>
-            <div class="text-sm font-bold text-gray-200">{{ ticker.setupStage }}</div>
-            <div class="flex flex-wrap gap-1 mt-1">
-                {% for tag in ticker.tags %}
-                <span class="px-1.5 py-0.5 rounded text-[9px] bg-gray-700 text-gray-300 border border-gray-600">{{
-                    tag }}</span>
-                {% endfor %}
+            <!-- Setup Info -->
+            <div class="mb-4">
+                <div class="text-xs text-gray-500 uppercase">Setup Stage</div>
+                <div class="text-sm font-bold text-gray-200">{{ ticker.setupStage }}</div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for tag in ticker.tags %}
+                    <span class="px-1.5 py-0.5 rounded text-[9px] bg-gray-700 text-gray-300 border border-gray-600">{{
+                        tag }}</span>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
 
-        <!-- Mobile Plan Expandable (Simple implementation: Always show buttons or simplified view) -->
-        {% if ticker.entryPlan %}
-        <details class="group bg-gray-800/50 rounded-lg p-3 border border-gray-700/30">
-            <summary class="flex justify-between items-center cursor-pointer list-none text-sm font-bold text-gray-300">
-                <span>View Trade Plan</span>
-                <span class="transition group-open:rotate-180">▼</span>
-            </summary>
-            <div class="mt-3 pt-3 border-t border-gray-700/50">
-                <h5 class="text-[10px] uppercase text-green-400 font-bold mb-1">Entry</h5>
-                <ul class="text-xs text-gray-300 list-disc pl-4 mb-2">
-                    {% for item in ticker.entryPlan %}<li>{{ item }}</li>{% endfor %}
-                </ul>
-                <h5 class="text-[10px] uppercase text-blue-400 font-bold mb-1">Exit</h5>
-                <ul class="text-xs text-gray-300 list-disc pl-4">
-                    {% for item in ticker.exitPlan %}<li>{{ item }}</li>{% endfor %}
-                </ul>
-            </div>
-        </details>
+            <!-- Mobile Plan Expandable (Simple implementation: Always show buttons or simplified view) -->
+            {% if ticker.entryPlan %}
+            <details class="group bg-gray-800/50 rounded-lg p-3 border border-gray-700/30">
+                <summary
+                    class="flex justify-between items-center cursor-pointer list-none text-sm font-bold text-gray-300">
+                    <span>View Trade Plan</span>
+                    <span class="transition group-open:rotate-180">▼</span>
+                </summary>
+                <div class="mt-3 pt-3 border-t border-gray-700/50">
+                    <h5 class="text-[10px] uppercase text-green-400 font-bold mb-1">Entry</h5>
+                    <ul class="text-xs text-gray-300 list-disc pl-4 mb-2">
+                        {% for item in ticker.entryPlan %}<li>{{ item }}</li>{% endfor %}
+                    </ul>
+                    <h5 class="text-[10px] uppercase text-blue-400 font-bold mb-1">Exit</h5>
+                    <ul class="text-xs text-gray-300 list-disc pl-4">
+                        {% for item in ticker.exitPlan %}<li>{{ item }}</li>{% endfor %}
+                    </ul>
+                </div>
+            </details>
+            {% else %}
+            <div class="text-center text-xs text-gray-600 italic py-2">No Plan Available</div>
+            {% endif %}
+
+        </div>
         {% else %}
-        <div class="text-center text-xs text-gray-600 italic py-2">No Plan Available</div>
-        {% endif %}
-
+        <!-- Empty State Mobile -->
+        <div class="col-span-1 rounded-xl bg-gray-900 border border-gray-700 p-8 text-center text-gray-500">
+            <p class="text-lg font-medium">No active signals</p>
+            <p class="text-sm mt-2">Check back later or adjust filters.</p>
+        </div>
+        {% endfor %}
     </div>
-    {% else %}
-    <!-- Empty State Mobile -->
-    <div class="col-span-1 rounded-xl bg-gray-900 border border-gray-700 p-8 text-center text-gray-500">
-        <p class="text-lg font-medium">No active signals</p>
-        <p class="text-sm mt-2">Check back later or adjust filters.</p>
-    </div>
-    {% endfor %}
-</div>
 </div>
 {% endblock %}
