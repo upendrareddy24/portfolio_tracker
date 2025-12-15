@@ -46,10 +46,13 @@ async def read_root(request: Request, account_id: int = 1):
     # Calculate summary stats (optional)
     total_tickers = len(tickers)
     
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "accounts": ACCOUNTS,
-        "current_account": current_account,
-        "tickers": tickers,
-        "last_updated": datetime.fromtimestamp(CACHE["timestamp"]).strftime('%H:%M:%S')
-    })
+    return templates.TemplateResponse(
+        request=request, 
+        name="index.html", 
+        context={
+            "accounts": ACCOUNTS,
+            "current_account": current_account,
+            "tickers": tickers,
+            "last_updated": datetime.fromtimestamp(CACHE["timestamp"]).strftime('%H:%M:%S')
+        }
+    )
