@@ -5,6 +5,7 @@ from config import ACCOUNTS, get_account_by_id
 from market_data import get_portfolio_data
 
 import os
+from datetime import datetime
 
 app = FastAPI()
 
