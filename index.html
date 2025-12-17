@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stellar Portfolio Tracker</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Outfit:wght@300;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel Library -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+
+<body>
+    <div class="glow-bg"></div>
+
+    <nav class="navbar">
+        <div class="logo">STELLAR <span class="highlight">TRACKER</span></div>
+        <div class="actions">
+            <label for="excel-upload" class="btn btn-secondary">
+                <i class="fas fa-file-excel"></i> Sync Excel
+                <input type="file" id="excel-upload" accept=".xlsx, .xls" hidden>
+            </label>
+            <button class="btn btn-primary" id="add-ticker-btn">
+                <i class="fas fa-plus"></i> Add Manually
+            </button>
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <header class="dashboard-header">
+            <h1>Portfolio <span class="highlight">Overview</span></h1>
+            <p>Track your investments across 7 strategic categories. No live API - fully manual & Excel-based control.
+            </p>
+        </header>
+
+        <div class="category-grid" id="category-grid">
+            <!-- 7 Category Cards will be injected here by JS -->
+        </div>
+    </main>
+
+    <!-- Modal for Adding/Editing Tickers -->
+    <div id="ticker-modal" class="modal">
+        <div class="modal-content glass">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Edit Category</h2>
+            <form id="ticker-form">
+                <div class="form-group">
+                    <label>Tickers (Comma Separated)</label>
+                    <textarea id="ticker-list" placeholder="AAPL, TSLA, MSFT..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
