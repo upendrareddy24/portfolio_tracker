@@ -47,12 +47,14 @@ function renderDashboard() {
     });
 
     // Animate entries
-    gsap.from(".category-card", {
+    gsap.set(".category-card", { opacity: 0, y: 30 });
+    gsap.to(".category-card", {
         duration: 0.8,
-        y: 30,
-        opacity: 0,
+        y: 0,
+        opacity: 1,
         stagger: 0.1,
-        ease: "power2.out"
+        ease: "power2.out",
+        overwrite: true
     });
 }
 
