@@ -12,7 +12,7 @@ const defaultPortfolio = [
     { id: 9, name: "Lot", tickers: [], icon: "fa-dice", color: "red", period: "1-5D" }
 ];
 
-let portfolio = JSON.parse(localStorage.getItem('liveStockpicksData')) || defaultPortfolio;
+let portfolio = JSON.parse(localStorage.getItem('stellarPortfolio')) || defaultPortfolio;
 let currentEditingId = null;
 
 // DOM Elements
